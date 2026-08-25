@@ -1,0 +1,17 @@
+[
+  {
+    "title": "Song One",
+    "artist": "Artist One",
+    "category": "mr_fang"
+  },
+  {
+    "title": "Song Two",
+    "artist": "Artist Two",
+    "category": "miss_fang"
+  },
+  {
+    "title": "Song Three",
+    "artist": "Artist Three",
+    "category": "duet"
+  }
+]
