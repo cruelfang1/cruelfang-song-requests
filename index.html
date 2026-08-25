@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Cruelfang Song Requests</title>
+<style>
+:root{--bg:#0b0b12;--panel:#171722;--panel2:#20202d;--text:#f4f4f7;--muted:#aaaabc;--accent:#9b4dff;--accent2:#e04bff;--border:#303043}
+*{box-sizing:border-box} body{margin:0;font-family:Arial,Helvetica,sans-serif;background:radial-gradient(circle at top,#201033 0,#0b0b12 42rem);color:var(--text)}
+header{padding:42px 20px 24px;text-align:center}.logo{font-size:clamp(2rem,6vw,4.5rem);font-weight:900;letter-spacing:.08em;text-transform:uppercase;text-shadow:0 0 28px #9b4dff}
+header p{color:var(--muted);margin:12px auto 0;max-width:680px}
+main{width:min(980px,92vw);margin:0 auto 50px}.searchbox{background:var(--panel);border:1px solid var(--border);border-radius:18px;padding:18px;position:sticky;top:10px;z-index:5;box-shadow:0 12px 40px #0008}
+input{width:100%;border:1px solid var(--border);border-radius:12px;background:#0d0d15;color:var(--text);padding:17px;font-size:1.05rem;outline:none}input:focus{border-color:var(--accent)}
+.stats{display:flex;justify-content:space-between;color:var(--muted);font-size:.9rem;padding:12px 2px 0}.songs{display:grid;gap:10px;margin-top:18px}.song{display:flex;align-items:center;justify-content:space-between;gap:16px;background:var(--panel);border:1px solid var(--border);border-radius:15px;padding:16px 18px}.song:hover{border-color:#6c45a0;background:var(--panel2)}.title{font-weight:800;font-size:1.05rem}.artist{color:var(--muted);margin-top:5px}
+button{border:0;border-radius:10px;padding:11px 16px;font-weight:800;color:white;background:linear-gradient(135deg,var(--accent),var(--accent2));cursor:pointer;white-space:nowrap}button:hover{filter:brightness(1.12)}
+.empty{text-align:center;padding:50px;color:var(--muted)}
+.modal{position:fixed;inset:0;background:#000b;display:none;align-items:center;justify-content:center;padding:20px;z-index:20}.modal.show{display:flex}.dialog{width:min(520px,100%);background:var(--panel);border:1px solid var(--border);border-radius:22px;padding:28px;box-shadow:0 30px 90px #000}.dialog h2{margin:0 0 12px}.selected{background:#0d0d15;border:1px solid var(--border);padding:16px;border-radius:14px;margin:18px 0}.command{font-family:ui-monospace,monospace;word-break:break-word;background:#07070d;padding:14px;border-radius:12px;border:1px solid var(--border);margin:16px 0}.actions{display:flex;gap:10px;flex-wrap:wrap}.secondary{background:#343444}.note{color:var(--muted);font-size:.9rem;line-height:1.5;margin-top:16px}
+footer{text-align:center;color:#777789;padding:10px 20px 40px;font-size:.85rem}
+@media(max-width:560px){.song{align-items:flex-start;flex-direction:column}.song button{width:100%}.stats{gap:8px;flex-direction:column}}
+</style>
+</head>
+<body>
+<header>
+  <div class="logo">Cruelfang</div>
+  <h1>Song Requests</h1>
+  <p>Search the song list, choose a song, then copy the request into Twitch chat.</p>
+</header>
+<main>
+  <div class="searchbox">
+    <input id="search" autocomplete="off" placeholder="Search by song title or artist..." aria-label="Search songs">
+    <div class="stats"><span id="count">Loading songs...</span><span id="status">No Twitch API required</span></div>
+  </div>
+  <div id="songs" class="songs"></div>
+</main>
+<footer>Cruelfang Song Requests</footer>
+
+<div id="modal" class="modal" role="dialog" aria-modal="true" aria-labelledby="modalTitle">
+  <div class="dialog">
+    <h2 id="modalTitle">Request this song?</h2>
+    <div id="selected" class="selected"></div>
+    <div class="command" id="command"></div>
+    <div class="actions">
+      <button id="copyBtn">Copy Request</button>
+      <button class="secondary" id="closeBtn">Cancel</button>
+    </div>
+    <div class="note">
+      After copying, return to Cruelfang's Twitch chat and paste the request as one message.
+    </div>
+  </div>
+</div>
+
+<script>
+let allSongs=[], current=null;
+const search=document.getElementById('search'), songsEl=document.getElementById('songs');
+const count=document.getElementById('count'), modal=document.getElementById('modal');
+const selected=document.getElementById('selected'), command=document.getElementById('command');
+
+function esc(s){return String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
+function render(){
+  const q=search.value.trim().toLowerCase();
+  const filtered=allSongs.filter(s=>!q || s.title.toLowerCase().includes(q) || s.artist.toLowerCase().includes(q));
+  count.textContent=`${filtered.length} of ${allSongs.length} songs`;
+  songsEl.innerHTML=filtered.length?filtered.map((s,i)=>`<div class="song"><div><div class="title">${esc(s.title)}</div><div class="artist">${esc(s.artist)}</div></div><button data-i="${allSongs.indexOf(s)}">Request</button></div>`).join(''):'<div class="empty">No songs found.</div>';
+  songsEl.querySelectorAll('button[data-i]').forEach(b=>b.onclick=()=>openRequest(allSongs[Number(b.dataset.i)]));
+}
+function openRequest(song){
+  current=song;
+  selected.innerHTML=`<div class="title">${esc(song.title)}</div><div class="artist">${esc(song.artist)}</div>`;
+  command.textContent=`!songrequest ${song.title} - ${song.artist}`;
+  modal.classList.add('show');
+}
+document.getElementById('closeBtn').onclick=()=>modal.classList.remove('show');
+modal.onclick=e=>{if(e.target===modal) modal.classList.remove('show');};
+document.getElementById('copyBtn').onclick=async()=>{
+  try{await navigator.clipboard.writeText(command.textContent);}
+  catch(e){const t=document.createElement('textarea');t.value=command.textContent;document.body.appendChild(t);t.select();document.execCommand('copy');t.remove();}
+  const b=document.getElementById('copyBtn'); b.textContent='Copied!';
+  setTimeout(()=>b.textContent='Copy Request',1800);
+};
+search.oninput=render;
+
+fetch('songs.json').then(r=>{
+  if(!r.ok) throw new Error('Could not load songs.json');
+  return r.json();
+}).then(data=>{
+  allSongs=data.sort((a,b)=>a.title.localeCompare(b.title));
+  render(); search.focus();
+}).catch(err=>{
+  count.textContent='Song list error';
+  songsEl.innerHTML=`<div class="empty">Could not load the song list.<br><br>${esc(err.message)}</div>`;
+});
+</script>
+</body>
+</html>
