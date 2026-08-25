@@ -1,26 +1,17 @@
 [
   {
-    "title": "All By My Self",
-    "artist": " Eric Carmen"
+    "title": "Song One",
+    "artist": "Artist One",
+    "category": "mr_fang"
   },
   {
-    "title": "All Out Of Love",
-    "artist": "Air Supply"
+    "title": "Song Two",
+    "artist": "Artist Two",
+    "category": "miss_fang"
   },
   {
-    "title": "Angels",
-    "artist": "Robbie Williams"
-  }
-    {
-    "title": "Beautiful In White",
-    "artist": " Shane Filan"
-  }
-    {
-    "title": "Beacuse Of You",
-    "artist": "Kelly Clarkson"
-  }
-    {
-    "title": "Blinding Lights",
-    "artist": "The Weeknd"
+    "title": "Song Three",
+    "artist": "Artist Three",
+    "category": "duet"
   }
 ]
