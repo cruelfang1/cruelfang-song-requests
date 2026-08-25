@@ -179,7 +179,7 @@ footer{text-align:center;color:#777089;padding:10px 20px 40px;font-size:.85rem}
 <header>
   <div class="logo">Cruelfang</div>
   <h1>Song Requests</h1>
-  <p>Search the song list or browse by performer. Choose a song, then copy the request into Twitch chat.</p>
+  <p>Search the song list or browse by performer. Choose a song and send it directly to the Cruelfang request queue.</p>
 </header>
 
 <main>
@@ -220,22 +220,25 @@ footer{text-align:center;color:#777089;padding:10px 20px 40px;font-size:.85rem}
   <div class="dialog">
     <h2>Request this song?</h2>
     <div id="selected" class="selected"></div>
-    <div class="command" id="command"></div>
+    <div class="command" id="command">Ready to add this song to the queue.</div>
     <div class="actions">
-      <button id="copyBtn">Copy Request</button>
+      <button id="sendBtn">Add to Queue</button>
       <button class="secondary" id="closeBtn">Cancel</button>
     </div>
-    <div class="note">After copying, return to Cruelfang's Twitch chat and paste the request as one message.</div>
+    <div class="note" id="requestNote">Your request will be sent directly to Cruelfang's live song queue.</div>
   </div>
 </div>
 
 <script>
+const QUEUE_API_URL='https://cruelfang-song-queue.cruelfang1.workers.dev';
 let allSongs=[];
+let chosenSong=null;
 const search=document.getElementById('search');
 const count=document.getElementById('count');
 const modal=document.getElementById('modal');
 const selected=document.getElementById('selected');
 const command=document.getElementById('command');
+const requestNote=document.getElementById('requestNote');
 
 function esc(s){return String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
 function normalizeCategory(c){
@@ -275,22 +278,41 @@ function render(){
 }
 function openRequest(song){
   if(!song)return;
+  chosenSong=song;
   selected.innerHTML=`<div class="title">${esc(song.title)}</div><div class="artist">${esc(song.artist)}</div>`;
-  command.textContent=`!songrequest ${song.title} - ${song.artist}`;
+  command.textContent='Ready to add this song to the queue.';
+  requestNote.textContent='Your request will be sent directly to Cruelfang's live song queue.';
+  document.getElementById('sendBtn').disabled=false;
+  document.getElementById('sendBtn').textContent='Add to Queue';
   modal.classList.add('show');
 }
 document.getElementById('closeBtn').onclick=()=>modal.classList.remove('show');
 modal.onclick=e=>{if(e.target===modal)modal.classList.remove('show');};
-document.getElementById('copyBtn').onclick=async()=>{
-  try{await navigator.clipboard.writeText(command.textContent);}
-  catch(e){
-    const t=document.createElement('textarea');
-    t.value=command.textContent;
-    document.body.appendChild(t);t.select();document.execCommand('copy');t.remove();
+document.getElementById('sendBtn').onclick=async()=>{
+  if(!chosenSong)return;
+  const b=document.getElementById('sendBtn');
+  b.disabled=true;
+  b.textContent='Sending...';
+  command.textContent='Sending your request to the queue...';
+  requestNote.textContent='Please wait.';
+  try{
+    const r=await fetch(QUEUE_API_URL+'/request',{
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({title:chosenSong.title,artist:chosenSong.artist})
+    });
+    const data=await r.json().catch(()=>({}));
+    if(!r.ok)throw new Error(data.error||'Could not add the song to the queue.');
+    command.textContent='Added to the queue!';
+    requestNote.textContent='Thank you for your song request.';
+    b.textContent='Added!';
+    setTimeout(()=>modal.classList.remove('show'),1400);
+  }catch(err){
+    command.textContent=err.message||'Could not add the song to the queue.';
+    requestNote.textContent='Please try again.';
+    b.disabled=false;
+    b.textContent='Try Again';
   }
-  const b=document.getElementById('copyBtn');
-  b.textContent='Copied!';
-  setTimeout(()=>b.textContent='Copy Request',1800);
 };
 search.oninput=render;
 
