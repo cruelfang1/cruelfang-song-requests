@@ -34,23 +34,19 @@
     "artist": "Cyndi Lauper",
     "category": "duet"
   },
-    {
-    "title": "Becuase Of You",
+  {
+    "title": "Because Of You",
     "artist": "Kelly Clarkson",
     "category": "mr_fang"
   },
-    {
+  {
     "title": "Blinding Lights",
     "artist": "The Weeknd",
     "category": "mr_fang"
-   },
-    {
-    "title": "Becuase Of You",
-    "artist": "Kelly Clarkson",
-    "category": "mr_fang"
   },
-    {
+  {
     "title": "Bright Eyes",
-    "artist": "Art Gurfunkle",
+    "artist": "Art Garfunkel",
     "category": "mr_fang"
+  }
 ]
