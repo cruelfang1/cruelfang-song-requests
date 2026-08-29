@@ -27,6 +27,20 @@ button{border:0;border-radius:10px;padding:11px 15px;background:linear-gradient(
   <div class="status" id="status">Loading...</div>
   <div id="queue"></div>
   <div style="margin-top:18px"><button class="danger" id="clearBtn">Clear Queue</button></div>
+  <div class="panel" style="margin-top:20px;padding:18px;background:#120e18">
+    <h2 style="margin-top:0">MIX IT UP</h2>
+    <div class="status">
+      Posts the current song queue to Twitch through your local Mix It Up installation.
+      No Twitch OAuth token is stored in this page.
+    </div>
+    <input id="mixitupUrl" type="text" value="http://localhost:8911/api/v2/chat/message"
+           autocomplete="off" style="margin-top:12px">
+    <div class="actions" style="margin-top:12px">
+      <button id="mixitupPostBtn">Post Queue To Twitch Chat</button>
+    </div>
+    <div class="status" id="mixitupStatus"></div>
+  </div>
+
 </div>
 </main>
 <script>
@@ -81,5 +95,64 @@ $("clearBtn").onclick=async()=>{
   await load();
 };
 if(adminKey){$("login").classList.add("hidden");$("app").classList.remove("hidden");load();}
-setInterval(()=>{if(!$("app").classList.contains("hidden"))load();},10000);
+
+$("mixitupPostBtn").onclick=async()=>{
+  const btn=$("mixitupPostBtn");
+  const status=$("mixitupStatus");
+  const url=$("mixitupUrl").value.trim();
+
+  if(!url){
+    status.textContent="Enter the Mix It Up Developer API URL.";
+    return;
+  }
+
+  btn.disabled=true;
+  status.textContent="Getting current queue...";
+
+  try{
+    const r=await api("/queue");
+    const d=await r.json();
+    if(!r.ok)throw new Error(d.error||"Could not load queue.");
+
+    const q=d.queue||[];
+    if(!q.length){
+      status.textContent="The queue is empty.";
+      return;
+    }
+
+    let message="Song Queue: "+q.map((x,i)=>{
+      const requester=x.requestedBy||"Unknown";
+      return `${i+1}. ${x.title} - ${requester} (${categoryLabel(x.category)})`;
+    }).join(" | ");
+
+    if(message.length>480)message=message.slice(0,477)+"...";
+
+    status.textContent="Sending to Mix It Up...";
+
+    const mr=await fetch(url,{
+      method:"POST",
+      headers:{"Content-Type":"application/json"},
+      body:JSON.stringify({
+        Message:message,
+        Platform:"Twitch",
+        SendAsStreamer:true
+      })
+    });
+
+    if(!mr.ok){
+      const text=await mr.text().catch(()=>"");
+      throw new Error(`Mix It Up returned HTTP ${mr.status}${text?": "+text:""}`);
+    }
+
+    status.textContent="Queue posted to Twitch chat.";
+  }catch(e){
+    console.error(e);
+    status.textContent=
+      "Could not reach Mix It Up. Make sure Mix It Up is running and Developer API is enabled. "+(e.message||"");
+  }finally{
+    btn.disabled=false;
+  }
+};
+
+setInterval(()=>{if(!$("app").classList.contains("hidden"))load();},2000);
 </script></body></html>
