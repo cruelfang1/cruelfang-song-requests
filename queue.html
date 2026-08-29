@@ -1,0 +1,142 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Cruelfang Song Queue</title>
+<style>
+body{margin:0;font-family:Arial,sans-serif;background:#0b0810;color:#f7f3fb}
+main{width:min(1000px,94vw);margin:35px auto}.logo{text-align:center;font-size:clamp(2rem,6vw,4rem);font-weight:900;letter-spacing:.08em;text-shadow:0 0 25px #a14dff}
+.panel{background:#17131f;border:1px solid #4a385c;border-radius:20px;padding:22px;margin-top:20px}
+input{width:100%;box-sizing:border-box;padding:14px;border-radius:10px;border:1px solid #4a385c;background:#0d0a12;color:#fff}
+button{border:0;border-radius:10px;padding:11px 15px;background:linear-gradient(135deg,#a14dff,#f05bff);color:#fff;font-weight:bold;cursor:pointer}.danger{background:#5b2635}.secondary{background:#403548}
+#queue{display:grid;gap:10px}.item{display:flex;justify-content:space-between;gap:15px;align-items:center;padding:15px;border:1px solid #3d304b;border-radius:14px;background:#120e18}
+.title{font-weight:bold}.artist{color:#b9afc4;margin-top:5px}.meta{margin-top:8px;font-weight:bold;color:#e4d7ef}.category{color:#c59aff}
+.actions{display:flex;gap:8px;flex-wrap:wrap}.empty{padding:35px;text-align:center;color:#aaa}.status{color:#b9afc4;margin-top:10px}.hidden{display:none}
+</style>
+</head>
+<body><main>
+<div class="logo">CRUELFANG</div>
+<div class="panel" id="login">
+  <h2>Song Queue Admin</h2>
+  <input id="key" type="password" placeholder="Enter admin password">
+  <div style="margin-top:12px"><button id="loginBtn">Open Queue</button></div>
+  <div class="status" id="loginStatus"></div>
+</div>
+<div class="panel hidden" id="app">
+  <h2>REQUEST QUEUE</h2>
+  <div class="status" id="status">Loading...</div>
+  <div id="queue"></div>
+  <div style="margin-top:18px"><button class="danger" id="clearBtn">Clear Queue</button></div>
+  <div class="panel" style="margin-top:20px;padding:18px;background:#120e18">
+    <h2 style="margin-top:0">MIX IT UP BOT</h2>
+    <div class="status">
+      Posts the current queue through the local Mix It Up bridge.
+      No Twitch OAuth token is stored in this page.
+    </div>
+    <div class="actions" style="margin-top:12px">
+      <button id="mixPostBtn">Post Queue To Twitch Chat</button>
+    </div>
+    <div class="status" id="mixStatus"></div>
+  </div>
+</div>
+</main>
+<script>
+const API_URL="https://cruelfang-song-queue.cruelfang1.workers.dev";
+let adminKey=sessionStorage.getItem("cruelfangAdminKey")||"";
+const $=id=>document.getElementById(id);
+function esc(s){return String(s??'').replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));}
+function categoryLabel(c){
+  c=String(c||'').toLowerCase().trim();
+  if(["mr_fang","mrfang","mr fang","mr_fang_solo"].includes(c))return"Mr Fang Solo";
+  if(["miss_fang","missfang","miss fang","miss_fang_solo"].includes(c))return"Miss Fang Solo";
+  if(["duet","duets"].includes(c))return"Duet";
+  return"Unknown Category";
+}
+async function api(path,opts={}){
+  const h={...(opts.headers||{})};
+  if(adminKey)h["X-Admin-Key"]=adminKey;
+  return fetch(API_URL+path,{...opts,headers:h});
+}
+async function load(){
+  const status=$("status");status.textContent="Refreshing queue...";
+  try{
+    const r=await api("/queue");const d=await r.json();if(!r.ok)throw new Error(d.error||"Could not load queue.");
+    const q=d.queue||[];status.textContent=`${q.length} request${q.length===1?"":"s"} in queue`;
+    $("queue").innerHTML=q.length?q.map((x,i)=>`
+      <div class="item">
+        <div>
+          <div class="title">${i+1}. ${esc(x.title)}</div>
+          <div class="artist">${esc(x.artist)}</div>
+          <div class="meta">Requested by: ${esc(x.requestedBy||"Unknown")}</div>
+          <div class="meta category">Category: ${esc(categoryLabel(x.category))}</div>
+        </div>
+        <div class="actions">
+          <button onclick="played('${encodeURIComponent(x.id)}')">Played</button>
+          <button class="secondary" onclick="removeItem('${encodeURIComponent(x.id)}')">Remove</button>
+        </div>
+      </div>`).join(""):'<div class="empty">The queue is empty.</div>';
+  }catch(e){status.textContent=e.message;}
+}
+async function played(id){const r=await api("/queue/"+id+"/played",{method:"POST"});if(!r.ok)alert((await r.json()).error||"Failed");await load();}
+async function removeItem(id){if(!confirm("Remove this request?"))return;const r=await api("/queue/"+id,{method:"DELETE"});if(!r.ok)alert((await r.json()).error||"Failed");await load();}
+$("loginBtn").onclick=async()=>{
+  adminKey=$("key").value.trim();
+  if(!adminKey){$("loginStatus").textContent="Enter your admin password.";return;}
+  sessionStorage.setItem("cruelfangAdminKey",adminKey);
+  $("login").classList.add("hidden");$("app").classList.remove("hidden");await load();
+};
+$("clearBtn").onclick=async()=>{
+  if(!confirm("Clear the entire queue?"))return;
+  const r=await api("/queue",{method:"DELETE"});
+  if(!r.ok)alert((await r.json()).error||"Failed");
+  await load();
+};
+if(adminKey){$("login").classList.add("hidden");$("app").classList.remove("hidden");load();}
+
+$("mixPostBtn").onclick=async()=>{
+  const btn=$("mixPostBtn");
+  const status=$("mixStatus");
+  btn.disabled=true;
+  status.textContent="Getting current queue...";
+
+  try{
+    const r=await api("/queue");
+    const d=await r.json();
+    if(!r.ok)throw new Error(d.error||"Could not load queue.");
+
+    const q=d.queue||[];
+    if(!q.length){
+      status.textContent="The queue is empty.";
+      return;
+    }
+
+    let message="Song Queue: "+q.map((x,i)=>{
+      const requester=x.requestedBy||"Unknown";
+      return `${i+1}. ${x.title} - ${requester} (${categoryLabel(x.category)})`;
+    }).join(" | ");
+
+    if(message.length>450)message=message.slice(0,447)+"...";
+
+    status.textContent="Sending to Mix It Up bot...";
+
+    const mr=await fetch("http://localhost:8765/post",{
+      method:"POST",
+      headers:{"Content-Type":"application/json"},
+      body:JSON.stringify({message})
+    });
+
+    const result=await mr.json().catch(()=>({}));
+    if(!mr.ok)throw new Error(result.error||`Local Mix It Up bridge returned HTTP ${mr.status}`);
+
+    status.textContent="Queue posted to Twitch chat by the Mix It Up bot.";
+  }catch(e){
+    console.error(e);
+    status.textContent=
+      "Could not post through Mix It Up. Make sure mixitup_bridge.py is running. "+(e.message||"");
+  }finally{
+    btn.disabled=false;
+  }
+};
+
+setInterval(()=>{if(!$("app").classList.contains("hidden"))load();},2000);
+</script></body></html>
